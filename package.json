@@ -1,0 +1,30 @@
+{
+	"name": "money-management-pwa",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"db:init": "node -e \"const fs=require('fs');const p=require('path');const dbPath=process.env.MONEY_DB_PATH||p.resolve('money_management.db');if(fs.existsSync(dbPath)){console.log('DB sudah ada:',dbPath);process.exit(0)}const Database=require('better-sqlite3');const d=new Database(dbPath);d.exec(fs.readFileSync(p.resolve('schema.sql'),'utf-8'));d.close();console.log('DB kosong dibuat:',dbPath)\""
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/adapter-node": "^5.5.7",
+		"@sveltejs/kit": "^2.63.0",
+		"@sveltejs/vite-plugin-svelte": "^7.1.2",
+		"@vite-pwa/sveltekit": "^1.1.0",
+		"svelte": "^5.56.1",
+		"svelte-check": "^4.6.0",
+		"typescript": "^6.0.3",
+		"vite": "^8.0.16",
+		"vite-plugin-pwa": "^1.3.0"
+	},
+	"dependencies": {
+		"better-sqlite3": "^13.0.3"
+	}
+}
