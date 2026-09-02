@@ -59,7 +59,38 @@ node build/index.js   # atau PORT=3000 node build/index.js
 
 | Variabel | Deskripsi | Default |
 |---|---|---|
+| `APP_PIN` | PIN untuk membuka aplikasi | `123456` |
 | `MONEY_DB_PATH` | Lokasi file database SQLite | `./money_management.db` |
+
+Salin `.env.example` ke `.env` untuk konfigurasi:
+
+```bash
+cp .env.example .env
+```
+
+---
+
+## 🔒 Keamanan (PIN)
+
+Aplikasi dilindungi **PIN** — setiap kali dibuka (session baru), akan diminta PIN sebelum konten ditampilkan.
+
+- **PIN disimpan di `.env`** (variabel `APP_PIN`), **tidak pernah** disimpan di database atau dikirim ke browser — verifikasi dilakukan di server
+- **Default PIN: `123456`** — WAJIB diganti sebelum dipakai untuk data sungguhan!
+- Setelah benar, unlock berlaku untuk **satu session** (tab/halaman) — tutup aplikasi & buka lagi akan diminta PIN ulang
+- Ada tombol **🔒** di pojok kanan atas untuk mengunci aplikasi secara manual
+- Brute-force diperlambat: percobaan gagal diberi jeda respons lebih lama
+
+### Cara mengganti PIN
+
+```bash
+# 1. Edit file .env (buat dulu dari .env.example kalau belum ada)
+APP_PIN=987654
+
+# 2. Restart server
+npm run dev
+```
+
+> ⚠️ **Catatan penting:** PIN ini adalah *lock screen* — melindungi dari orang yang membuka HP/app. Ini **bukan enkripsi data**: file database (SQLite) tetap bisa dibaca langsung oleh siapa pun yang punya akses ke file-nya. Untuk proteksi penuh, gunakan enkripsi disk (FileVault di macOS / BitLocker di Windows) dan jangan pernah membagikan file `money_management.db`.
 
 ---
 
