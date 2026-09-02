@@ -94,6 +94,61 @@ npm run dev
 
 ---
 
+## 🤖 Integrasi AI (MCP Server)
+
+Aplikasi ini punya **MCP server** (`mcp-server.mjs`) — jadi AI agent (Claude Desktop, Cursor, Claude Code, Hermes Agent, dll) bisa langsung bertanya & menganalisis data keuangan lewat protokol [Model Context Protocol](https://modelcontextprotocol.io).
+
+### Jalankan
+
+```bash
+npm run mcp
+```
+
+Server berjalan di **stdio** — siap dihubungkan ke AI agent apa pun.
+
+### Tools yang tersedia
+
+| Tool | Deskripsi |
+|---|---|
+| `get_summary` | Ringkasan income/expense/tabungan/saldo/aset per bulan |
+| `get_expenses` | Daftar transaksi pengeluaran (filter kategori, limit) |
+| `get_budget` | Budget vs realisasi per kategori (kategori tabungan di-exclude) |
+| `get_assets` | Portofolio aset + profit/loss (**harga realtime** saham/crypto/emas) |
+| `get_gold` | Koleksi emas + nilai realtime per gram (spread Antam) |
+| `get_receivables` | Daftar piutang (filter status) |
+| `get_haji_target` | Progress target haji + simulasi nabung (ETA lunas) |
+| `list_months` | Bulan-bulan yang punya data |
+| `get_meta` | Master data: kategori, akun, sumber income, tipe aset |
+
+### Contoh koneksi
+
+**Claude Desktop** — tambah ke `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "money-management": {
+      "command": "node",
+      "args": ["/absolute/path/ke/aplikasi-budgeting/mcp-server.mjs"]
+    }
+  }
+}
+```
+
+**Cursor / IDE lain** — tambah MCP server dengan command:
+```
+node /absolute/path/ke/aplikasi-budgeting/mcp-server.mjs
+```
+
+**Hermes Agent:**
+```bash
+hermes mcp add money-management -- node /absolute/path/ke/aplikasi-budgeting/mcp-server.mjs
+```
+
+Database dibaca **read-only** — AI hanya bisa membaca, tidak bisa mengubah data. Konfigurasi path DB via env `MONEY_DB_PATH`.
+
+---
+
 ## 🗄️ Database
 
 Aplikasi menggunakan **SQLite** via `better-sqlite3`. **Database tidak ikut di-commit** (lihat `.gitignore`) — setiap orang yang clone memulai dengan **database kosong** berisi master data dasar, lalu mengisi datanya sendiri lewat aplikasi.
