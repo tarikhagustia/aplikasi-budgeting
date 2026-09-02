@@ -590,14 +590,32 @@ const transportMode = process.env.MCP_TRANSPORT || 'stdio';
 if (transportMode === 'http') {
 	// Mode HTTP (Streamable HTTP) — cocok dijalankan di Docker/container,
 	// AI client connect via URL: http://host:3001/mcp
+	// Dilindungi API key di header: `x-mcp-key: <MCP_API_KEY | APP_PIN>`
 	const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
 	const { default: express } = await import('express');
+
+	// Key: prioritaskan MCP_API_KEY, fallback ke APP_PIN, terakhir default 123456
+	const expectedKey = process.env.MCP_API_KEY || process.env.APP_PIN || '123456';
+
+	function checkAuth(req, res) {
+		let key = req.headers['x-mcp-key'];
+		if (!key) {
+			const auth = req.headers['authorization'];
+			if (auth && auth.startsWith('Bearer ')) key = auth.slice(7);
+		}
+		if (key !== expectedKey) {
+			res.status(401).json({ error: 'Unauthorized — sertakan header x-mcp-key (atau Authorization: Bearer <key>)' });
+			return false;
+		}
+		return true;
+	}
 
 	const app = express();
 	app.use(express.json({ limit: '1mb' }));
 	const sessions = new Map();
 
 	app.post('/mcp', async (req, res) => {
+		if (!checkAuth(req, res)) return;
 		const sessionId = req.headers['mcp-session-id'];
 		const existing = sessionId ? sessions.get(sessionId) : null;
 		if (existing) {
@@ -615,12 +633,14 @@ if (transportMode === 'http') {
 	});
 
 	app.get('/mcp', (req, res) => {
+		if (!checkAuth(req, res)) return;
 		const t = sessions.get(req.headers['mcp-session-id']);
 		if (t) t.handleRequest(req, res, null);
 		else res.status(400).json({ error: 'Session tidak ditemukan' });
 	});
 
 	app.delete('/mcp', (req, res) => {
+		if (!checkAuth(req, res)) return;
 		const sid = req.headers['mcp-session-id'];
 		const t = sessions.get(sid);
 		if (t) {
@@ -634,7 +654,7 @@ if (transportMode === 'http') {
 
 	const mcpPort = Number(process.env.MCP_PORT || 3001);
 	app.listen(mcpPort, () => {
-		console.error(`[mcp] HTTP server siap di http://localhost:${mcpPort}/mcp (transport: streamable HTTP)`);
+		console.error(`[mcp] HTTP server siap di http://localhost:${mcpPort}/mcp (transport: streamable HTTP, auth: x-mcp-key)`);
 	});
 } else {
 	// Mode stdio (default) — untuk AI agent lokal (Claude Desktop, Cursor, Hermes)

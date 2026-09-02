@@ -144,6 +144,31 @@ Aplikasi ini punya **MCP server** (`mcp-server.mjs`) — jadi AI agent (Claude D
 | **stdio** | `npm run mcp` | AI agent lokal di mesin yang sama (Claude Desktop, Cursor, Hermes) |
 | **HTTP** | `MCP_TRANSPORT=http MCP_PORT=3001 npm run mcp` | AI agent connect via URL `http://host:3001/mcp` — termasuk yang jalan di **Docker** (`docker compose` sudah otomatis) |
 
+### 🔑 Proteksi MCP HTTP (API Key di Header)
+
+Mode HTTP **wajib menyertakan API key di header** — tanpa key yang benar, server menolak dengan **401 Unauthorized**:
+
+| Header | Contoh |
+|---|---|
+| `x-mcp-key` | `x-mcp-key: 123456` |
+| atau `Authorization` | `Authorization: Bearer 123456` |
+
+**Key diambil dari env (prioritas):**
+1. `MCP_API_KEY` — key khusus MCP (disarankan, bisa beda dari PIN web)
+2. `APP_PIN` — fallback ke PIN aplikasi
+3. `123456` — default (⚠️ ganti!)
+
+**Contoh client (curl):**
+```bash
+curl -X POST http://localhost:3001/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "x-mcp-key: 123456" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+```
+
+**Docker:** set `MCP_API_KEY` di env saat `docker compose up` — kalau tidak diset, otomatis mengikuti `APP_PIN`.
+
 ### Tools yang tersedia
 
 **Baca:**

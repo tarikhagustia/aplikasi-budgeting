@@ -30,6 +30,7 @@ services:
     environment:
       - MCP_TRANSPORT=http
       - MCP_PORT=3001
+      - MCP_API_KEY=${MCP_API_KEY:-${APP_PIN:-123456}}
       - MONEY_DB_PATH=/data/money_management.db
     ports:
       - "3001:3001"
