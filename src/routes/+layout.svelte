@@ -8,10 +8,21 @@
 	let installPrompt: any = $state(null);
 	let showInstall = $state(false);
 
+	const navItems = [
+		{ href: '/', label: 'Home', ico: '🏠' },
+		{ href: '/aset', label: 'Aset', ico: '🏦' },
+		{ href: '/budget', label: 'Budget', ico: '📋' },
+		{ href: '/target', label: 'Target', ico: '🎯' },
+		{ href: '/tambah', label: 'Tambah', ico: '➕' },
+		{ href: '/emas', label: 'Emas', ico: '🥇' },
+		{ href: '/piutang', label: 'Piutang', ico: '📌' },
+		{ href: '/riwayat', label: 'Riwayat', ico: '🧾' }
+	];
+
 	// ── PIN lock ──────────────────────────────────────────
-	// unlock tersimpan di sessionStorage → tiap kali app dibuka (session baru) minta PIN lagi
+	// Konten SELALU dirender (aman untuk SSR/hydration) — layar PIN hanya OVERLAY di atasnya.
+	// Saat locked, overlay menutupi layar; setelah unlock, overlay hilang.
 	let locked = $state(true);
-	let checking = $state(true);   // saat SSR/hydration, jangan render konten dulu
 	let pinInput = $state('');
 	let pinError = $state(false);
 	let pinBusy = $state(false);
@@ -25,14 +36,13 @@
 			showInstall = true;
 		});
 
-		// cek status unlock dari sessionStorage
+		// cek status unlock dari sessionStorage (session baru = minta PIN lagi)
 		try {
 			const unlocked = sessionStorage.getItem(PIN_KEY) === '1';
 			locked = !unlocked;
 		} catch {
 			locked = true;
 		}
-		checking = false;
 	});
 
 	async function unlock() {
@@ -74,7 +84,21 @@
 	}
 </script>
 
-<!-- Layar kunci PIN — full-screen, muncul sebelum konten -->
+<!-- Konten utama — SELALU dirender (SSR & client), ditutup overlay PIN saat locked -->
+<main>
+	{@render children()}
+</main>
+
+<nav class="bottom-nav">
+	{#each navItems as item}
+		<a href={item.href} class="nav-item" class:active={page.url.pathname === item.href}>
+			<span class="ico">{item.ico}</span>
+			{item.label}
+		</a>
+	{/each}
+</nav>
+
+<!-- Layar kunci PIN — overlay full-screen di atas konten -->
 {#if locked}
 	<div style="position:fixed;inset:0;z-index:999;background:var(--cream);
 		display:flex;align-items:center;justify-content:center;padding:24px">
@@ -131,7 +155,7 @@
 	</div>
 {/if}
 
-{#if !checking && !locked}
+{#if !locked}
 	<button onclick={lockNow} aria-label="Kunci aplikasi"
 		title="Kunci aplikasi"
 		style="position:fixed;top:12px;right:12px;z-index:150;background:#fff;border:1px solid #e2d9cc;
@@ -139,19 +163,4 @@
 			display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(60,50,40,0.08)">
 		🔒
 	</button>
-{/if}
-
-{#if !checking && !locked}
-	<main>
-		{@render children()}
-	</main>
-
-	<nav class="bottom-nav">
-		{#each navItems as item}
-			<a href={item.href} class="nav-item" class:active={page.url.pathname === item.href}>
-				<span class="ico">{item.ico}</span>
-				{item.label}
-			</a>
-		{/each}
-	</nav>
 {/if}
