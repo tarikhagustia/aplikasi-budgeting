@@ -104,7 +104,11 @@ Aplikasi siap dijalankan dengan **Docker** — database otomatis tersimpan di vo
 docker compose up -d --build
 ```
 
-Akses **http://localhost:3000** — container pertama kali jalan akan membuat database kosong di volume `money-data`.
+Akses:
+- **Web:** http://localhost:3000
+- **MCP (AI):** http://localhost:3001/mcp
+
+Container pertama kali jalan akan membuat database kosong di volume `money-data`. **Web & MCP share volume database yang sama** — satu tempat, satu data.
 
 ### Konfigurasi
 
@@ -124,10 +128,8 @@ docker run -d -p 3000:3000 -e APP_PIN=123456 -v money-data:/data money-managemen
 ### Struktur
 
 - **`Dockerfile`** — multi-stage (builder + runner), image akhir ringan, healthcheck bawaan
-- **`docker-compose.yml`** — service `web` + volume `money-data`
+- **`docker-compose.yml`** — dua service: `web` (port 3000) + `mcp` (port 3001), share volume `money-data`
 - **`.dockerignore`** — database & file pribadi tidak pernah masuk image
-
-> 💡 **Catatan MCP + Docker:** MCP server (`npm run mcp`) dijalankan di **host**, bukan di container — karena MCP butuh akses file DB langsung. Pastikan `MONEY_DB_PATH` di host menunjuk ke file yang sama dengan yang di-mount ke container, atau biarkan masing-masing punya DB sendiri.
 
 ---
 
@@ -135,13 +137,12 @@ docker run -d -p 3000:3000 -e APP_PIN=123456 -v money-data:/data money-managemen
 
 Aplikasi ini punya **MCP server** (`mcp-server.mjs`) — jadi AI agent (Claude Desktop, Cursor, Claude Code, Hermes Agent, dll) bisa langsung bertanya & menganalisis data keuangan lewat protokol [Model Context Protocol](https://modelcontextprotocol.io).
 
-### Jalankan
+### Dua mode transport
 
-```bash
-npm run mcp
-```
-
-Server berjalan di **stdio** — siap dihubungkan ke AI agent apa pun.
+| Mode | Cara jalan | Kapan dipakai |
+|---|---|---|
+| **stdio** | `npm run mcp` | AI agent lokal di mesin yang sama (Claude Desktop, Cursor, Hermes) |
+| **HTTP** | `MCP_TRANSPORT=http MCP_PORT=3001 npm run mcp` | AI agent connect via URL `http://host:3001/mcp` — termasuk yang jalan di **Docker** (`docker compose` sudah otomatis) |
 
 ### Tools yang tersedia
 

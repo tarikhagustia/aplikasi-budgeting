@@ -29,14 +29,16 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Build output + schema (untuk auto-init DB kalau kosong)
+# Build output + schema + MCP server (untuk auto-init DB kalau kosong & integrasi AI)
 COPY --from=builder /app/build ./build
 COPY schema.sql ./schema.sql
+COPY mcp-server.mjs ./mcp-server.mjs
 
 # Volume untuk database — data persist walau container dihapus
 VOLUME ["/data"]
 
 EXPOSE 3000
+EXPOSE 3001
 
 # Healthcheck — cek server hidup
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

@@ -1,13 +1,13 @@
 # Money Management — docker-compose
 # Jalankan: docker compose up -d --build
-# Akses:   http://localhost:3000
+# Akses:   http://localhost:3000 (web) · http://localhost:3001/mcp (MCP HTTP)
 #
-# Catatan:
-# - Database disimpan di volume "money-data" (/data di container) — data PERSIST
-#   walau container dihapus/dibuat ulang
-# - Ganti PIN lewat environment: APP_PIN
-# - Untuk integrasi MCP (AI), jalankan di host: npm run mcp
-#   (MCP butuh akses file DB — jalankan di host atau mount volume yang sama)
+# Dua service dalam SATU tempat (compose yang sama), share volume database yang sama:
+#   - web : aplikasi PWA (port 3000)
+#   - mcp : MCP server mode HTTP (port 3001) — AI client connect ke http://localhost:3001/mcp
+#
+# Ganti PIN:   APP_PIN=987654 docker compose up -d
+# Reset data:  docker compose down -v (⚠️ hapus volume + semua data)
 
 services:
   web:
@@ -22,6 +22,22 @@ services:
     volumes:
       - money-data:/data
     restart: unless-stopped
+
+  mcp:
+    build: .
+    container_name: money-management-mcp
+    command: ["node", "mcp-server.mjs"]
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_PORT=3001
+      - MONEY_DB_PATH=/data/money_management.db
+    ports:
+      - "3001:3001"
+    volumes:
+      - money-data:/data
+    restart: unless-stopped
+    depends_on:
+      - web
 
 volumes:
   money-data:

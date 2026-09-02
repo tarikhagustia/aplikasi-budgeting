@@ -25,10 +25,18 @@ import { z } from 'zod';
 const DB_PATH = process.env.MONEY_DB_PATH || path.resolve(process.cwd(), 'money_management.db');
 const SCHEMA_PATH = path.resolve(process.cwd(), 'schema.sql');
 
+// Auto-init: kalau DB belum ada (container baru/volume kosong), buat dari schema.sql
 if (!fs.existsSync(DB_PATH)) {
-	console.error(`[mcp] Database tidak ditemukan: ${DB_PATH}`);
-	console.error('[mcp] Jalankan "npm run db:init" atau set MONEY_DB_PATH');
-	process.exit(1);
+	if (fs.existsSync(SCHEMA_PATH)) {
+		console.error(`[mcp] Database tidak ditemukan: ${DB_PATH} — membuat dari schema.sql...`);
+		const fresh = new Database(DB_PATH);
+		fresh.exec(fs.readFileSync(SCHEMA_PATH, 'utf-8'));
+		fresh.close();
+		console.error('[mcp] Database kosong berhasil dibuat.');
+	} else {
+		console.error(`[mcp] Database tidak ditemukan: ${DB_PATH} dan schema.sql tidak ada.`);
+		process.exit(1);
+	}
 }
 
 const db = new Database(DB_PATH);
@@ -140,10 +148,12 @@ function wrap(data) {
 }
 
 // ── MCP Server ────────────────────────────────────────────
-const server = new McpServer({
-	name: 'money-management',
-	version: '1.0.0'
-});
+// Buat instance baru per koneksi (dibutuhkan untuk mode HTTP multi-session)
+function createServer() {
+	const server = new McpServer({
+		name: 'money-management',
+		version: '1.0.0'
+	});
 
 // 1. Ringkasan bulanan
 server.registerTool(
@@ -571,7 +581,65 @@ server.registerTool(
 	}
 );
 
-// ── Jalankan (stdio) ──────────────────────────────────────
-const transport = new StdioServerTransport();
-await server.connect(transport);
-console.error('[mcp] Money Management MCP server siap di stdio.');
+	return server;
+}
+
+// ── Jalankan ──────────────────────────────────────────────
+const transportMode = process.env.MCP_TRANSPORT || 'stdio';
+
+if (transportMode === 'http') {
+	// Mode HTTP (Streamable HTTP) — cocok dijalankan di Docker/container,
+	// AI client connect via URL: http://host:3001/mcp
+	const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+	const { default: express } = await import('express');
+
+	const app = express();
+	app.use(express.json({ limit: '1mb' }));
+	const sessions = new Map();
+
+	app.post('/mcp', async (req, res) => {
+		const sessionId = req.headers['mcp-session-id'];
+		const existing = sessionId ? sessions.get(sessionId) : null;
+		if (existing) {
+			await existing.handleRequest(req, res, req.body);
+			return;
+		}
+		const transport = new StreamableHTTPServerTransport({
+			onsessioninitialized: (sid) => {
+				sessions.set(sid, transport);
+			}
+		});
+		const server = createServer();
+		await server.connect(transport);
+		await transport.handleRequest(req, res, req.body);
+	});
+
+	app.get('/mcp', (req, res) => {
+		const t = sessions.get(req.headers['mcp-session-id']);
+		if (t) t.handleRequest(req, res, null);
+		else res.status(400).json({ error: 'Session tidak ditemukan' });
+	});
+
+	app.delete('/mcp', (req, res) => {
+		const sid = req.headers['mcp-session-id'];
+		const t = sessions.get(sid);
+		if (t) {
+			sessions.delete(sid);
+			t.close();
+			res.status(200).json({ ok: true });
+		} else {
+			res.status(404).json({ error: 'Session tidak ditemukan' });
+		}
+	});
+
+	const mcpPort = Number(process.env.MCP_PORT || 3001);
+	app.listen(mcpPort, () => {
+		console.error(`[mcp] HTTP server siap di http://localhost:${mcpPort}/mcp (transport: streamable HTTP)`);
+	});
+} else {
+	// Mode stdio (default) — untuk AI agent lokal (Claude Desktop, Cursor, Hermes)
+	const server = createServer();
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
+	console.error('[mcp] Money Management MCP server siap di stdio.');
+}
