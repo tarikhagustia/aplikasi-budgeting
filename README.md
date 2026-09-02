@@ -108,6 +108,8 @@ Server berjalan di **stdio** — siap dihubungkan ke AI agent apa pun.
 
 ### Tools yang tersedia
 
+**Baca:**
+
 | Tool | Deskripsi |
 |---|---|
 | `get_summary` | Ringkasan income/expense/tabungan/saldo/aset per bulan |
@@ -119,6 +121,18 @@ Server berjalan di **stdio** — siap dihubungkan ke AI agent apa pun.
 | `get_haji_target` | Progress target haji + simulasi nabung (ETA lunas) |
 | `list_months` | Bulan-bulan yang punya data |
 | `get_meta` | Master data: kategori, akun, sumber income, tipe aset |
+
+**Tulis (AI bisa mencatat transaksi):**
+
+| Tool | Deskripsi |
+|---|---|
+| `add_expense` | Catat pengeluaran baru (kategori auto-buat kalau belum ada, akun default BCA) |
+| `add_income` | Catat pemasukan baru (sumber auto-buat) |
+| `update_expense` | Ubah transaksi pengeluaran (kirim field yang mau diubah saja) |
+| `delete_expense` | Hapus transaksi pengeluaran by id |
+| `delete_income` | Hapus transaksi pemasukan by id |
+
+Contoh: AI bisa diminta *"catat pengeluaran 50rb buat makan siang hari ini"* → tool `add_expense` langsung menyimpannya ke database.
 
 ### Contoh koneksi
 
@@ -145,7 +159,9 @@ node /absolute/path/ke/aplikasi-budgeting/mcp-server.mjs
 hermes mcp add money-management -- node /absolute/path/ke/aplikasi-budgeting/mcp-server.mjs
 ```
 
-Database dibaca **read-only** — AI hanya bisa membaca, tidak bisa mengubah data. Konfigurasi path DB via env `MONEY_DB_PATH`.
+Database bisa **dibaca & ditulis** oleh AI (nambah/ubah/hapus transaksi). Konfigurasi path DB via env `MONEY_DB_PATH`.
+
+> ⚠️ **Catatan keamanan MCP:** karena AI bisa menulis data, pastikan MCP server hanya dijalankan di lingkungan yang Bos percaya (mesin lokal Bos). Jangan expose MCP server ke jaringan publik tanpa proteksi — gunakan PIN/otorisasi di sisi klien AI.
 
 ---
 

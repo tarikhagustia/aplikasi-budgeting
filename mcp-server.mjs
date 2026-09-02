@@ -31,11 +31,41 @@ if (!fs.existsSync(DB_PATH)) {
 	process.exit(1);
 }
 
-const db = new Database(DB_PATH, { readonly: true });
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 // ── Helpers ───────────────────────────────────────────────
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+// resolve kategori by name (case-insensitive) — auto-create kalau belum ada (grup Needs)
+function resolveCategory(name) {
+	const n = String(name || '').trim();
+	if (!n) throw new Error('Kategori wajib diisi');
+	const row = db.prepare(`SELECT id FROM categories WHERE lower(name) = lower(?)`).get(n);
+	if (row) return row.id;
+	const info = db.prepare(`INSERT INTO categories(name, group_id, is_saving) VALUES (?, 1, 0)`).run(n);
+	return Number(info.lastInsertRowid);
+}
+
+// resolve akun by name — default BCA kalau tidak ditemukan
+function resolveAccount(name) {
+	const n = String(name || '').trim();
+	if (n) {
+		const row = db.prepare(`SELECT id FROM accounts WHERE lower(name) = lower(?)`).get(n);
+		if (row) return row.id;
+	}
+	const def = db.prepare(`SELECT id FROM accounts ORDER BY id LIMIT 1`).get();
+	return def ? def.id : null;
+}
+
+// resolve sumber income by name — auto-create kalau belum ada
+function resolveSource(name) {
+	const n = String(name || '').trim() || 'Lain-lain';
+	const row = db.prepare(`SELECT id FROM income_sources WHERE lower(name) = lower(?)`).get(n);
+	if (row) return row.id;
+	const info = db.prepare(`INSERT INTO income_sources(name) VALUES (?)`).run(n);
+	return Number(info.lastInsertRowid);
+}
 
 function monthKey(year, month) {
 	return `${year}-${String(month).padStart(2, '0')}`;
@@ -415,6 +445,129 @@ server.registerTool(
 		const sources = db.prepare(`SELECT id, name FROM income_sources`).all();
 		const assetTypes = db.prepare(`SELECT id, name, liquidity FROM asset_types`).all();
 		return wrap({ categories, accounts, income_sources: sources, asset_types: assetTypes });
+	}
+);
+
+// ── WRITE: AI bisa menulis transaksi ──────────────────────
+
+// 10. Tambah pengeluaran
+server.registerTool(
+	'add_expense',
+	{
+		title: 'Tambah transaksi pengeluaran',
+		description: 'Catat transaksi pengeluaran baru. Kategori diisi nama (auto-buat kalau belum ada). Akun default BCA.',
+		inputSchema: {
+			date: z.string().describe('Tanggal YYYY-MM-DD, misal 2026-09-05'),
+			description: z.string().describe('Deskripsi transaksi, misal "Beli sembako"'),
+			category: z.string().describe('Nama kategori, misal "Shopping" / "Makanan"'),
+			amount: z.number().positive().describe('Jumlah dalam Rupiah'),
+			account: z.string().optional().describe('Nama akun: BCA / BSI / CASH (default BCA)'),
+			is_verified: z.boolean().optional().default(false).describe('Sudah diverifikasi')
+		}
+	},
+	async ({ date, description, category, amount, account, is_verified }) => {
+		const categoryId = resolveCategory(category);
+		const accountId = resolveAccount(account);
+		const info = db.prepare(
+			`INSERT INTO expenses(date, description, category_id, account_id, amount, is_verified)
+			 VALUES (?,?,?,?,?,?)`
+		).run(date, description, categoryId, accountId, amount, is_verified ? 1 : 0);
+		return wrap({ ok: true, id: Number(info.lastInsertRowid), message: `Pengeluaran "${description}" Rp ${amount.toLocaleString('id-ID')} dicatat` });
+	}
+);
+
+// 11. Tambah pemasukan
+server.registerTool(
+	'add_income',
+	{
+		title: 'Tambah transaksi pemasukan',
+		description: 'Catat transaksi pemasukan baru. Sumber auto-buat kalau belum ada. Akun default BCA.',
+		inputSchema: {
+			date: z.string().describe('Tanggal YYYY-MM-DD'),
+			source: z.string().describe('Nama sumber income, misal "Profit Kantor" / "Gaji"'),
+			amount: z.number().positive().describe('Jumlah dalam Rupiah'),
+			account: z.string().optional().describe('Nama akun: BCA / BSI / CASH (default BCA)'),
+			note: z.string().optional().describe('Catatan')
+		}
+	},
+	async ({ date, source, amount, account, note }) => {
+		const sourceId = resolveSource(source);
+		const accountId = resolveAccount(account);
+		const info = db.prepare(
+			`INSERT INTO incomes(date, source_id, account_id, amount, note)
+			 VALUES (?,?,?,?,?)`
+		).run(date, sourceId, accountId, amount, note || null);
+		return wrap({ ok: true, id: Number(info.lastInsertRowid), message: `Pemasukan "${source}" Rp ${amount.toLocaleString('id-ID')} dicatat` });
+	}
+);
+
+// 12. Update pengeluaran
+server.registerTool(
+	'update_expense',
+	{
+		title: 'Update transaksi pengeluaran',
+		description: 'Ubah field transaksi pengeluaran berdasarkan id. Kirim hanya field yang mau diubah.',
+		inputSchema: {
+			id: z.number().int().describe('ID transaksi (lihat dari get_expenses)'),
+			date: z.string().optional(),
+			description: z.string().optional(),
+			category: z.string().optional().describe('Nama kategori baru'),
+			amount: z.number().positive().optional(),
+			account: z.string().optional(),
+			is_verified: z.boolean().optional()
+		}
+	},
+	async ({ id, date, description, category, amount, account, is_verified }) => {
+		const row = db.prepare(`SELECT id FROM expenses WHERE id=?`).get(id);
+		if (!row) return wrap({ ok: false, error: `Transaksi ${id} tidak ditemukan` });
+
+		const sets = [];
+		const vals = [];
+		if (date !== undefined) { sets.push('date=?'); vals.push(date); }
+		if (description !== undefined) { sets.push('description=?'); vals.push(description); }
+		if (category !== undefined) { sets.push('category_id=?'); vals.push(resolveCategory(category)); }
+		if (amount !== undefined) { sets.push('amount=?'); vals.push(amount); }
+		if (account !== undefined) { sets.push('account_id=?'); vals.push(resolveAccount(account)); }
+		if (is_verified !== undefined) { sets.push('is_verified=?'); vals.push(is_verified ? 1 : 0); }
+		if (!sets.length) return wrap({ ok: false, error: 'Tidak ada field yang diubah' });
+
+		vals.push(id);
+		db.prepare(`UPDATE expenses SET ${sets.join(', ')} WHERE id=?`).run(...vals);
+		return wrap({ ok: true, message: `Transaksi ${id} diperbarui` });
+	}
+);
+
+// 13. Hapus pengeluaran
+server.registerTool(
+	'delete_expense',
+	{
+		title: 'Hapus transaksi pengeluaran',
+		description: 'Hapus transaksi pengeluaran berdasarkan id.',
+		inputSchema: {
+			id: z.number().int().describe('ID transaksi (lihat dari get_expenses)')
+		}
+	},
+	async ({ id }) => {
+		const info = db.prepare(`DELETE FROM expenses WHERE id=?`).run(id);
+		if (!info.changes) return wrap({ ok: false, error: `Transaksi ${id} tidak ditemukan` });
+		return wrap({ ok: true, message: `Transaksi ${id} dihapus` });
+	}
+);
+
+// 14. Hapus pemasukan
+server.registerTool(
+	'delete_income',
+	{
+		title: 'Hapus transaksi pemasukan',
+		description: 'Hapus transaksi pemasukan berdasarkan id.',
+		inputSchema: {
+			id: z.number().int().describe('ID transaksi')
+		}
+	},
+	async ({ id }) => {
+		const info = db.prepare(`DELETE FROM incomes WHERE id=?`).run(id);
+		if (!info.changes) return wrap({ ok: false, error: `Transaksi ${id} tidak ditemukan` });
+		return wrap({ ok: true, message: `Transaksi ${id} dihapus` });
 	}
 );
 
