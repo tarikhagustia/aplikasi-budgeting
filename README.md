@@ -94,6 +94,43 @@ npm run dev
 
 ---
 
+## 🐳 Docker
+
+Aplikasi siap dijalankan dengan **Docker** — database otomatis tersimpan di volume, jadi data **persist** walau container dihapus/dibuat ulang.
+
+### Cara cepat (docker compose)
+
+```bash
+docker compose up -d --build
+```
+
+Akses **http://localhost:3000** — container pertama kali jalan akan membuat database kosong di volume `money-data`.
+
+### Konfigurasi
+
+| Opsi | Cara |
+|---|---|
+| Ganti PIN | `APP_PIN=987654 docker compose up -d` (atau set di `.env`) |
+| Ganti port | `ports: "8080:3000"` di `docker-compose.yml` |
+| Reset data | `docker compose down -v` (⚠️ hapus volume + semua data) |
+
+### Build manual
+
+```bash
+docker build -t money-management .
+docker run -d -p 3000:3000 -e APP_PIN=123456 -v money-data:/data money-management
+```
+
+### Struktur
+
+- **`Dockerfile`** — multi-stage (builder + runner), image akhir ringan, healthcheck bawaan
+- **`docker-compose.yml`** — service `web` + volume `money-data`
+- **`.dockerignore`** — database & file pribadi tidak pernah masuk image
+
+> 💡 **Catatan MCP + Docker:** MCP server (`npm run mcp`) dijalankan di **host**, bukan di container — karena MCP butuh akses file DB langsung. Pastikan `MONEY_DB_PATH` di host menunjuk ke file yang sama dengan yang di-mount ke container, atau biarkan masing-masing punya DB sendiri.
+
+---
+
 ## 🤖 Integrasi AI (MCP Server)
 
 Aplikasi ini punya **MCP server** (`mcp-server.mjs`) — jadi AI agent (Claude Desktop, Cursor, Claude Code, Hermes Agent, dll) bisa langsung bertanya & menganalisis data keuangan lewat protokol [Model Context Protocol](https://modelcontextprotocol.io).

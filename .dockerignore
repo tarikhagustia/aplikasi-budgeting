@@ -1,0 +1,32 @@
+# ── Docker ignore ──────────────────────────────────────────
+# Jangan pernah kirim data pribadi / artefak build ke image
+
+node_modules
+build
+.svelte-kit
+.output
+.vercel
+.netlify
+
+# Database (data pribadi!)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Git & OS
+.git
+.gitignore
+.DS_Store
+Thumbs.db
+
+# Screenshot & artefak lokal
+pwa_preview.png
+*.preview.png
