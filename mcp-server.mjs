@@ -41,6 +41,8 @@ if (!fs.existsSync(DB_PATH)) {
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('busy_timeout = 5000'); // tunggu s.d. 5 detik kalau DB dikunci proses web (akses bersamaan)
 
 // ── Helpers ───────────────────────────────────────────────
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];

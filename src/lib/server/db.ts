@@ -25,6 +25,8 @@ export function getDb(): Database.Database {
 		initDbIfNeeded();
 		db = new Database(DB_PATH);
 		db.pragma('journal_mode = WAL');
+		db.pragma('synchronous = NORMAL');
+		db.pragma('busy_timeout = 5000'); // tunggu s.d. 5 detik kalau DB dikunci proses lain (web + mcp akses bersamaan)
 		db.pragma('foreign_keys = ON');
 	}
 	return db;
