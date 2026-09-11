@@ -29,6 +29,7 @@ vite.config.ts.timestamp-*
 *.db-shm
 *.sqlite
 *.sqlite3
+/database/
 
 # Preview / screenshot lokal
 pwa_preview.png

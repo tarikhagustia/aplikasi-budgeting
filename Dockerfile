@@ -40,8 +40,8 @@ VOLUME ["/data"]
 EXPOSE 3000
 EXPOSE 3001
 
-# Healthcheck — cek server hidup
+# Healthcheck — cek server hidup (otomatis pilih port sesuai mode: web=PORT, mcp=MCP_PORT)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const p = process.env.MCP_TRANSPORT === 'http' ? (process.env.MCP_PORT||3001) : (process.env.PORT||3000); const path = process.env.MCP_TRANSPORT === 'http' ? '/mcp' : '/'; fetch('http://localhost:'+p+path).then(r=>process.exit(r.status < 500 ?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "build/index.js"]

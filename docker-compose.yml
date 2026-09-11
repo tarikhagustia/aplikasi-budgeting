@@ -2,12 +2,15 @@
 # Jalankan: docker compose up -d --build
 # Akses:   http://localhost:3000 (web) · http://localhost:3001/mcp (MCP HTTP)
 #
-# Dua service dalam SATU tempat (compose yang sama), share volume database yang sama:
+# Dua service dalam SATU tempat (compose yang sama), share database yang sama:
 #   - web : aplikasi PWA (port 3000)
 #   - mcp : MCP server mode HTTP (port 3001) — AI client connect ke http://localhost:3001/mcp
 #
+# Database disimpan sebagai bind mount ./database/ (folder lokal, bukan Docker volume) —
+# gampang di-backup / dilihat langsung dari host.
+#
 # Ganti PIN:   APP_PIN=987654 docker compose up -d
-# Reset data:  docker compose down -v (⚠️ hapus volume + semua data)
+# Reset data:  hapus isi folder ./database/ manual (⚠️ backup dulu kalau perlu)
 
 services:
   web:
@@ -20,7 +23,7 @@ services:
       - APP_PIN=${APP_PIN:-123456}
       - MONEY_DB_PATH=/data/money_management.db
     volumes:
-      - money-data:/data
+      - ./database:/data
     restart: unless-stopped
 
   mcp:
@@ -35,7 +38,7 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - money-data:/data
+      - ./database:/data
     restart: unless-stopped
     depends_on:
       - web
